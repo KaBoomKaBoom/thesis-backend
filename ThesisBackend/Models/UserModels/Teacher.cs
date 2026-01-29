@@ -1,4 +1,4 @@
-﻿namespace ThesisBackend.Models
+﻿namespace ThesisBackend.Models.UserModels
 {
     public class Teacher : User
     {

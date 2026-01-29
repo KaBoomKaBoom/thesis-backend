@@ -2,9 +2,8 @@
 {
     public class Student : User
     {
-        public required string Institution { get; set; }
+        public string Institution { get; set; } = string.Empty;
 
-        //
-        public required string Grade { get; set; }
+        public string Grade { get; set; } = string.Empty;
     }
 }

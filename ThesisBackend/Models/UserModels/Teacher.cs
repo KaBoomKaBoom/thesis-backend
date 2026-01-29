@@ -2,7 +2,7 @@
 {
     public class Teacher : User
     {
-        public required string Institution { get; set; }
-        public required string Course { get; set; }
+        public string Institution { get; set; } = string.Empty;
+        public string Course { get; set; } = string.Empty;
     }
 }

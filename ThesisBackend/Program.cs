@@ -4,8 +4,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Scalar.AspNetCore;
+using ThesisBackend.Helpers;
+using ThesisBackend.Services;
+using ThesisBackend.Data;
+using DotNetEnv;
+using Npgsql.EntityFrameworkCore.PostgreSQL; 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load .env file
+Env.Load();
 
 // Configure logging
 builder.Logging.ClearProviders();
@@ -22,6 +30,27 @@ builder.Services.AddOpenApi();
 IConfiguration config = new ConfigurationBuilder()
     .AddEnvironmentVariables()
     .Build();
+
+// Add this line to get the connection string from environment variables or configuration
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+    ?? throw new InvalidOperationException("DB_CONNECTION_STRING is not set in environment variables");
+
+// Register JwtGenerator as a singleton
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") 
+    ?? throw new InvalidOperationException("JWT_SECRET is not set in environment variables");
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") 
+    ?? throw new InvalidOperationException("JWT_ISSUER is not set in environment variables");
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") 
+    ?? throw new InvalidOperationException("JWT_AUDIENCE is not set in environment variables");
+
+builder.Services.AddSingleton(new JwtGenerator(jwtSecret, jwtIssuer, jwtAudience));
+
+// Register UserService
+builder.Services.AddScoped<UserService>();
+
+// Register DbContext (uncomment and configure when ready)
+builder.Services.AddDbContext<UserContext>(options =>
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddCors((options) =>
 {

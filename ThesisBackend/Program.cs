@@ -77,6 +77,8 @@ var app = builder.Build();
 // Get logger instance
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
+logger.LogInformation($"Using connection string: {connectionString}");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapScalarApiReference("/docs" ,options =>

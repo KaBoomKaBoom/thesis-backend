@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ThesisBackend.Services
 {
-    public class UserService(UserContext userContext, ILogger<UserService> logger, JwtGenerator jwtGenerator)
+    public class UserService(UserContext userContext, ILogger<UserService> logger, JwtHelper jwtGenerator)
     {
         public readonly UserContext _userContext = userContext;
-        public readonly JwtGenerator _jwtGenerator = jwtGenerator;
+        public readonly JwtHelper _jwtGenerator = jwtGenerator;
         public readonly ILogger<UserService> _logger = logger;
 
         public async Task<(User user, string token)> CreateUser(UserToRegisterDTO user)
@@ -89,6 +89,48 @@ namespace ThesisBackend.Services
             _logger.LogInformation("JWT token generated for user: {Email}", dbUser.Email);
 
             return token;
+        }
+
+        public async Task<string> RefreshToken(string expiredToken)
+        {
+            _logger.LogInformation("Token refresh requested");
+
+            // Validate token without checking expiration
+            var principal = _jwtGenerator.ValidateToken(expiredToken, validateLifetime: false);
+            if (principal == null)
+            {
+                _logger.LogWarning("Invalid token provided for refresh");
+                throw new InvalidOperationException("Invalid token");
+            }
+
+            // Extract user ID from token claims
+            var userIdClaim = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                _logger.LogWarning("Invalid user ID in token");
+                throw new InvalidOperationException("Invalid token claims");
+            }
+
+            // Verify user still exists in database
+            if (_userContext?.Users == null)
+            {
+                _logger.LogError("UserContext or Users DbSet is null");
+                throw new InvalidOperationException("UserContext or Users DbSet is null");
+            }
+
+            var dbUser = await _userContext.Users.FindAsync(userId);
+            if (dbUser == null)
+            {
+                _logger.LogWarning("User with ID: {UserId} not found", userId);
+                throw new InvalidOperationException("User not found");
+            }
+
+            // Generate new token
+            var newToken = _jwtGenerator.GenerateToken(dbUser.UserId, dbUser.Email, dbUser.Role);
+
+            _logger.LogInformation("New JWT token generated for user: {Email}", dbUser.Email);
+
+            return newToken;
         }
     }
 }

@@ -39,9 +39,28 @@ namespace ThesisBackend.Controllers
                 var token = await _userService.LogUser(userToLogin);
                 return Ok(token);
             }
+            catch (InvalidOperationException)
+            {
+                return Unauthorized();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "An error occurred while processing your request.", Details = ex.Message });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("refresh/{token}")]
+        public async Task<IActionResult> RefreshToken(string token)
+        {
+            try
+            {
+                var newToken = await _userService.RefreshToken(token);
+                return Ok(new { Token = newToken });
+            }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new { Message = ex.Message });
+                return Unauthorized(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

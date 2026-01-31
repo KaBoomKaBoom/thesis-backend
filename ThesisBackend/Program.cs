@@ -1,14 +1,17 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using System.Text;
+using DotNetEnv;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Scalar.AspNetCore;
+using ThesisBackend.Data;
 using ThesisBackend.Helpers;
 using ThesisBackend.Services;
-using ThesisBackend.Data;
-using DotNetEnv;
-using Npgsql.EntityFrameworkCore.PostgreSQL; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,7 +46,24 @@ var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
 var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") 
     ?? throw new InvalidOperationException("JWT_AUDIENCE is not set in environment variables");
 
-builder.Services.AddSingleton(new JwtGenerator(jwtSecret, jwtIssuer, jwtAudience));
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            };
+        });
+
+builder.Services.AddSingleton(new JwtHelper(jwtSecret, jwtIssuer, jwtAudience));
+
+builder.Services.AddAuthorization();
 
 // Register UserService
 builder.Services.AddScoped<UserService>();
@@ -91,6 +111,9 @@ else
 {
     app.UseCors("ProdCors");
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Adds the /openapi/{documentName}.json endpoint
 app.MapOpenApi();

@@ -5,13 +5,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace ThesisBackend.Helpers
 {
-    public class JwtGenerator
+    public class JwtHelper
     {
         private readonly string _secretKey;
         private readonly string _issuer;
         private readonly string _audience;
 
-        public JwtGenerator(string secretKey, string issuer, string audience)
+        public JwtHelper(string secretKey, string issuer, string audience)
         {
             _secretKey = secretKey;
             _issuer = issuer;
@@ -34,11 +34,39 @@ namespace ThesisBackend.Helpers
                 issuer: _issuer,
                 audience: _audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(1),
+                expires: DateTime.UtcNow.AddDays(7),
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        public ClaimsPrincipal? ValidateToken(string token, bool validateLifetime = true)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
+
+            try
+            {
+                var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = key,
+                    ValidateIssuer = true,
+                    ValidIssuer = _issuer,
+                    ValidateAudience = true,
+                    ValidAudience = _audience,
+                    ValidateLifetime = validateLifetime,
+                    ClockSkew = TimeSpan.Zero
+                }, out SecurityToken validatedToken);
+
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
     }
 }

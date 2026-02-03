@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Net.Mail;
 
-namespace ThesisBackend.Services
+namespace ThesisBackend.Services.AuthServices
 {
     public class EmailService(string smtpServer, int smtpPort, string senderEmail, string senderName, string senderPassword)
     {

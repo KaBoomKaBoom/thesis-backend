@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ThesisBackend.DTOs.UserDTOs;
-using ThesisBackend.Services;
+using ThesisBackend.Services.AuthServices;
 
 namespace ThesisBackend.Controllers
 {

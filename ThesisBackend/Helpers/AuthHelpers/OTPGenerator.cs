@@ -1,4 +1,4 @@
-﻿namespace ThesisBackend.Helpers
+﻿namespace ThesisBackend.Helpers.AuthHelpers
 {
     public class OTPGenerator
     {

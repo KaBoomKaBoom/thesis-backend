@@ -10,8 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Scalar.AspNetCore;
 using ThesisBackend.Data;
-using ThesisBackend.Helpers;
-using ThesisBackend.Services;
+using ThesisBackend.Helpers.AuthHelpers;
+using ThesisBackend.Services.AuthServices;
 
 var builder = WebApplication.CreateBuilder(args);
 

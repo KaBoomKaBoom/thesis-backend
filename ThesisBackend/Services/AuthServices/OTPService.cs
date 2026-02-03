@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using ThesisBackend.DTOs.UserDTOs;
-using ThesisBackend.Helpers;
+using ThesisBackend.Helpers.AuthHelpers;
 
-namespace ThesisBackend.Services
+namespace ThesisBackend.Services.AuthServices
 {
     public class OTPService(OTPGenerator otpGenerator, EmailService emailService, IDistributedCache cache, ILogger<OTPService> logger)
     {

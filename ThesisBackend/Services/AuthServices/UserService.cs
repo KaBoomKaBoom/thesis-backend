@@ -4,10 +4,10 @@ using BCrypt.Net;
 using Microsoft.EntityFrameworkCore;
 using ThesisBackend.Data;
 using ThesisBackend.DTOs.UserDTOs;
-using ThesisBackend.Helpers;
+using ThesisBackend.Helpers.AuthHelpers;
 using ThesisBackend.Models.UserModels;
 
-namespace ThesisBackend.Services
+namespace ThesisBackend.Services.AuthServices
 {
     public class UserService(UserContext userContext, ILogger<UserService> logger, JwtHelper jwtGenerator)
     {

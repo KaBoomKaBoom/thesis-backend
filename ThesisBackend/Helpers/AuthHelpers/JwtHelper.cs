@@ -3,7 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 
-namespace ThesisBackend.Helpers
+namespace ThesisBackend.Helpers.AuthHelpers
 {
     public class JwtHelper
     {

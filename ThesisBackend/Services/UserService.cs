@@ -1,9 +1,11 @@
-﻿using BCrypt.Net;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using BCrypt.Net;
+using Microsoft.EntityFrameworkCore;
 using ThesisBackend.Data;
 using ThesisBackend.DTOs.UserDTOs;
-using ThesisBackend.Models.UserModels;
 using ThesisBackend.Helpers;
-using Microsoft.EntityFrameworkCore;
+using ThesisBackend.Models.UserModels;
 
 namespace ThesisBackend.Services
 {
@@ -12,6 +14,31 @@ namespace ThesisBackend.Services
         public readonly UserContext _userContext = userContext;
         public readonly JwtHelper _jwtGenerator = jwtGenerator;
         public readonly ILogger<UserService> _logger = logger;
+
+        public async Task<bool> CheckUserExists(string email)
+        {
+            if (_userContext?.Users == null)
+            {
+                _logger.LogError("UserContext or Users DbSet is null");
+                throw new InvalidOperationException("UserContext or Users DbSet is null");
+            }
+
+            return await _userContext.Users.AnyAsync(u => u.Email == email);
+        }
+
+        public async Task<bool> DbHealth()
+        {
+            try
+            {
+                await _userContext.Database.CanConnectAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database health check failed");
+                return false;
+            }
+        }
 
         public async Task<(User user, string token)> CreateUser(UserToRegisterDTO user)
         {
@@ -51,7 +78,6 @@ namespace ThesisBackend.Services
 
             _logger.LogInformation("User with email: {Email} created successfully. ID: {ID}", newUser.Email, newUser.UserId);
 
-            // Generate JWT token
             var token = _jwtGenerator.GenerateToken(newUser.UserId, newUser.Email, newUser.Role);
 
             _logger.LogInformation("JWT token generated for user: {Email}", newUser.Email);
@@ -59,10 +85,9 @@ namespace ThesisBackend.Services
             return (newUser, token);
         }
 
-
         public async Task<string> LogUser(UserToLoginDTO user)
         {
-            _logger.LogInformation("User with email {Email} requested to log iin into the system", user.Email);
+            _logger.LogInformation("User with email {Email} requested to log in into the system", user.Email);
 
             if (_userContext?.Users == null)
             {
@@ -95,7 +120,6 @@ namespace ThesisBackend.Services
         {
             _logger.LogInformation("Token refresh requested");
 
-            // Validate token without checking expiration
             var principal = _jwtGenerator.ValidateToken(expiredToken, validateLifetime: false);
             if (principal == null)
             {
@@ -103,15 +127,23 @@ namespace ThesisBackend.Services
                 throw new InvalidOperationException("Invalid token");
             }
 
-            // Extract user ID from token claims
-            var userIdClaim = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub);
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)
+                           ?? principal.FindFirst(ClaimTypes.NameIdentifier)
+                           ?? principal.FindFirst("sub");
+
+            if (userIdClaim == null)
             {
-                _logger.LogWarning("Invalid user ID in token");
+                _logger.LogWarning("User ID claim not found in token. Available claims: {Claims}", 
+                    string.Join(", ", principal.Claims.Select(c => $"{c.Type}={c.Value}")));
                 throw new InvalidOperationException("Invalid token claims");
             }
 
-            // Verify user still exists in database
+            if (!int.TryParse(userIdClaim.Value, out int userId))
+            {
+                _logger.LogWarning("Invalid user ID format in token: {UserId}", userIdClaim.Value);
+                throw new InvalidOperationException("Invalid token claims");
+            }
+
             if (_userContext?.Users == null)
             {
                 _logger.LogError("UserContext or Users DbSet is null");
@@ -125,7 +157,6 @@ namespace ThesisBackend.Services
                 throw new InvalidOperationException("User not found");
             }
 
-            // Generate new token
             var newToken = _jwtGenerator.GenerateToken(dbUser.UserId, dbUser.Email, dbUser.Role);
 
             _logger.LogInformation("New JWT token generated for user: {Email}", dbUser.Email);

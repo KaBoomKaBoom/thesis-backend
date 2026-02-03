@@ -38,6 +38,16 @@ IConfiguration config = new ConfigurationBuilder()
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
     ?? throw new InvalidOperationException("DB_CONNECTION_STRING is not set in environment variables");
 
+// Redis configuration
+var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING") 
+    ?? "localhost:6379";
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnectionString;
+    options.InstanceName = "ThesisBackend_";
+});
+
 // Register JwtGenerator as a singleton
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") 
     ?? throw new InvalidOperationException("JWT_SECRET is not set in environment variables");
@@ -65,10 +75,25 @@ builder.Services.AddSingleton(new JwtHelper(jwtSecret, jwtIssuer, jwtAudience));
 
 builder.Services.AddAuthorization();
 
-// Register UserService
+// Register services
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<EmailService>(serviceProvider =>
+{
+    var smtpServer = Environment.GetEnvironmentVariable("SMTP_SERVER") 
+        ?? throw new InvalidOperationException("SMTP_SERVER is not set");
+    var smtpPort = int.Parse(Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587");
+    var senderEmail = Environment.GetEnvironmentVariable("SENDER_EMAIL") 
+        ?? throw new InvalidOperationException("SENDER_EMAIL is not set");
+    var senderName = Environment.GetEnvironmentVariable("SENDER_NAME") ?? "Thesis Backend";
+    var senderPassword = Environment.GetEnvironmentVariable("SENDER_PASSWORD") 
+        ?? throw new InvalidOperationException("SENDER_PASSWORD is not set");
+    
+    return new EmailService(smtpServer, smtpPort, senderEmail, senderName, senderPassword);
+});
+builder.Services.AddScoped<OTPService>();
+builder.Services.AddSingleton<OTPGenerator>();
 
-// Register DbContext (uncomment and configure when ready)
+// Register DbContext
 builder.Services.AddDbContext<UserContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -103,7 +128,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapScalarApiReference("/docs" ,options =>
     {
-        options.WithTitle("API Documentation For Thesis Bacend");
+        options.WithTitle("API Documentation For Thesis Backend");
     });
     app.UseCors("DevCors");
 }
@@ -112,11 +137,11 @@ else
     app.UseCors("ProdCors");
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
-
 // Adds the /openapi/{documentName}.json endpoint
 app.MapOpenApi();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

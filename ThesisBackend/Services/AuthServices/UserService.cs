@@ -40,6 +40,145 @@ namespace ThesisBackend.Services.AuthServices
             }
         }
 
+        public async Task<User?> GetUserById(int userId)
+        {
+            _logger.LogInformation("Fetching user with ID: {UserId}", userId);
+
+            if (_userContext?.Users == null)
+            {
+                _logger.LogError("UserContext or Users DbSet is null");
+                throw new InvalidOperationException("UserContext or Users DbSet is null");
+            }
+
+            var user = await _userContext.Users.FindAsync(userId);
+            
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID: {UserId} not found", userId);
+            }
+
+            return user;
+        }
+
+        public async Task<User> UpdateUser(int userId, UserToUpdateDTO updateDTO)
+        {
+            _logger.LogInformation("Updating user with ID: {UserId}", userId);
+
+            if (_userContext?.Users == null)
+            {
+                _logger.LogError("UserContext or Users DbSet is null");
+                throw new InvalidOperationException("UserContext or Users DbSet is null");
+            }
+
+            var user = await _userContext.Users.FindAsync(userId);
+
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID: {UserId} not found", userId);
+                throw new InvalidOperationException("User not found");
+            }
+
+            // Update basic user fields
+            if (!string.IsNullOrWhiteSpace(updateDTO.FirstName))
+            {
+                user.FirstName = updateDTO.FirstName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(updateDTO.LastName))
+            {
+                user.LastName = updateDTO.LastName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(updateDTO.Email))
+            {
+                // Check if email is already taken by another user
+                var emailExists = await _userContext.Users.AnyAsync(u => u.Email == updateDTO.Email && u.UserId != userId);
+                if (emailExists)
+                {
+                    _logger.LogWarning("Email {Email} is already taken by another user", updateDTO.Email);
+                    throw new InvalidOperationException("Email is already taken by another user");
+                }
+                user.Email = updateDTO.Email;
+            }
+
+            user.PhoneNumber = updateDTO.PhoneNumber ?? user.PhoneNumber;
+            user.Location = updateDTO.Location ?? user.Location;
+            user.Biography = updateDTO.Biography ?? user.Biography;
+
+            // Update role-specific fields
+            switch (user)
+            {
+                case Student student:
+                    // Handle both base DTO and derived StudentToUpdateDTO
+                    if (updateDTO is StudentToUpdateDTO studentUpdate)
+                    {
+                        if (!string.IsNullOrWhiteSpace(studentUpdate.Institution))
+                        {
+                            student.Institution = studentUpdate.Institution;
+                        }
+                        if (!string.IsNullOrWhiteSpace(studentUpdate.Grade))
+                        {
+                            student.Grade = studentUpdate.Grade;
+                        }
+                    }
+                    else
+                    {
+                        // Handle base DTO properties (School and GradeLevel)
+                        if (!string.IsNullOrWhiteSpace(updateDTO.School))
+                        {
+                            student.Institution = updateDTO.School;
+                        }
+                        if (!string.IsNullOrWhiteSpace(updateDTO.GradeLevel))
+                        {
+                            student.Grade = updateDTO.GradeLevel;
+                        }
+                    }
+                    break;
+
+                case Teacher teacher:
+                    if (updateDTO is TeacherToUpdateDTO teacherUpdate)
+                    {
+                        if (!string.IsNullOrWhiteSpace(teacherUpdate.Institution))
+                        {
+                            teacher.Institution = teacherUpdate.Institution;
+                        }
+                        if (!string.IsNullOrWhiteSpace(teacherUpdate.Course))
+                        {
+                            teacher.Course = teacherUpdate.Course;
+                        }
+                    }
+                    else
+                    {
+                        // Handle base DTO property (School)
+                        if (!string.IsNullOrWhiteSpace(updateDTO.School))
+                        {
+                            teacher.Institution = updateDTO.School;
+                        }
+                    }
+                    break;
+
+                case Parent parent when updateDTO is ParentToUpdateDTO parentUpdate:
+                    if (parentUpdate.ChildrenIds != null && parentUpdate.ChildrenIds.Count > 0)
+                    {
+                        parent.ChildrenIds = parentUpdate.ChildrenIds;
+                    }
+                    break;
+            }
+
+            try
+            {
+                await _userContext.SaveChangesAsync();
+                _logger.LogInformation("User with ID: {UserId} updated successfully", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating user with ID: {UserId}", userId);
+                throw;
+            }
+
+            return user;
+        }
+
         public async Task<(User user, string token)> CreateUser(UserToRegisterDTO user)
         {
             _logger.LogInformation("Creating user with email: {Email} and role: {Role}", user.Email, user.Role);
@@ -163,5 +302,7 @@ namespace ThesisBackend.Services.AuthServices
 
             return newToken;
         }
+
+        
     }
 }

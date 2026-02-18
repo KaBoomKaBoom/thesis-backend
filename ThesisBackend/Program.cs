@@ -15,6 +15,7 @@ using Scalar.AspNetCore;
 using ThesisBackend.Data;
 using ThesisBackend.Helpers.AuthHelpers;
 using ThesisBackend.Services.AuthServices;
+using ThesisBackend.Services.TestSessionServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,8 +97,17 @@ builder.Services.AddScoped<EmailService>(serviceProvider =>
 builder.Services.AddScoped<OTPService>();
 builder.Services.AddSingleton<OTPGenerator>();
 
+// Register HttpClient for external service calls
+builder.Services.AddHttpClient();
+
+// Register TestSessionService
+builder.Services.AddScoped<TestSessionService>();
+
 // Register DbContext
 builder.Services.AddDbContext<UserContext>(options =>
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddDbContext<TestSessionContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddCors((options) =>

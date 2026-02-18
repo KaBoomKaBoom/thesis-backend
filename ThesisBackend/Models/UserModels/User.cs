@@ -10,6 +10,8 @@
 
         // student/teacher/parent/admin
         public required string Role { get; set; }
-
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string Location { get; set; } = string.Empty;
+        public string Biography { get; set; } = string.Empty;
     }
 }

@@ -1,4 +1,7 @@
-﻿using System.Text;
+﻿//TODO: Update User Model to add the missing fields from the frontend
+
+
+using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;

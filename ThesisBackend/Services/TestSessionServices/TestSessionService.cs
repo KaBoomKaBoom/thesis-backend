@@ -22,7 +22,13 @@ namespace ThesisBackend.Services.TestSessionServices
                 {
                     UserId = userId,
                     TestId = testSessionToSave.TestId,
-                    TestComponents = testSessionToSave.TestComponents,
+                    TestComponents = testSessionToSave.TestComponents
+                        .Select(tc => new TestComponent
+                        {
+                            answer_id = tc.answer_id,
+                            question_id = tc.question_id
+                        })
+                        .ToList(),
                     TestTakenTime = DateTime.UtcNow
                 };
                 _testSessionContext.TestSessions.Add(testSession);

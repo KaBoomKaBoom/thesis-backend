@@ -21,6 +21,7 @@ namespace ThesisBackend.Data
                 {
                     tc.WithOwner().HasForeignKey("SessionId");
                     tc.HasKey(e => e.Id);
+                    tc.Property(e => e.Id).ValueGeneratedOnAdd();
                 });
             });
 
@@ -37,8 +38,10 @@ namespace ThesisBackend.Data
                 {
                     dr.WithOwner().HasForeignKey("ResultId");
                     dr.HasKey(e => e.Id);
+                    dr.Property(e => e.Id).ValueGeneratedOnAdd();
                 });
             });
         }
     }
 }
+

@@ -1,4 +1,4 @@
-# Thesis Backend - User Handling Microservice
+﻿# Thesis Backend - User Handling Microservice
 
 ## Table of contents
 - [1. Project title](#1-project-title)
@@ -132,34 +132,35 @@ By default the API is bound to `http://0.0.0.0:8080`.
 ## 8. Project structure
 ```text
 thesis-backend/
-?? README.md
-?? ThesisBackend/
-   ?? Controllers/
-   ?  ?? AuthentificationController.cs
-   ?  ?? UserController.cs
-   ?  ?? TestSessionController.cs
-   ?? Services/
-   ?  ?? AuthServices/
-   ?  ?  ?? UserService.cs
-   ?  ?  ?? OTPService.cs
-   ?  ?  ?? EmailService.cs
-   ?  ?? TestSessionServices/
-   ?     ?? TestSessionService.cs
-   ?? Data/
-   ?  ?? UserContext.cs
-   ?  ?? TestSessionContext.cs
-   ?? Models/
-   ?  ?? UserModels/
-   ?  ?? TestSessionModels/
-   ?? DTOs/
-   ?  ?? UserDTOs/
-   ?  ?? TestSessionDTOs/
-   ?? Helpers/
-   ?  ?? AuthHelpers/
-   ?? Migrations/
-   ?  ?? (UserContext migrations)
-   ?  ?? TestSession/
-   ?     ?? (TestSessionContext migrations)
-   ?? Program.cs
-   ?? ThesisBackend.csproj
+├─ README.md
+└─ ThesisBackend/
+   ├─ Controllers/
+   │  ├─ AuthentificationController.cs
+   │  ├─ UserController.cs
+   │  └─ TestSessionController.cs
+   ├─ Services/
+   │  ├─ AuthServices/
+   │  │  ├─ UserService.cs
+   │  │  ├─ OTPService.cs
+   │  │  └─ EmailService.cs
+   │  └─ TestSessionServices/
+   │     └─ TestSessionService.cs
+   ├─ Data/
+   │  ├─ UserContext.cs
+   │  └─ TestSessionContext.cs
+   ├─ Models/
+   │  ├─ UserModels/
+   │  └─ TestSessionModels/
+   ├─ DTOs/
+   │  ├─ UserDTOs/
+   │  └─ TestSessionDTOs/
+   ├─ Helpers/
+   │  └─ AuthHelpers/
+   ├─ Migrations/
+   │  ├─ (UserContext migrations)
+   │  └─ TestSession/
+   │     └─ (TestSessionContext migrations)
+   ├─ Program.cs
+   └─ ThesisBackend.csproj
+```
 

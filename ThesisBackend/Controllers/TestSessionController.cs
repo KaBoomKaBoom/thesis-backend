@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ThesisBackend.DTOs.TestSessionDTOs;
-using ThesisBackend.Models.TestSessionModels;
 using ThesisBackend.Services.TestSessionServices;
 
 namespace ThesisBackend.Controllers
@@ -19,11 +18,7 @@ namespace ThesisBackend.Controllers
         {
             try
             {
-                // Extract user ID from JWT token
-                var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
-                               ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)
-                               ?? User.FindFirst("sub");
-                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+                if (!TryGetUserId(out var userId))
                 {
                     return Unauthorized(new { Message = "Invalid token" });
                 }
@@ -53,6 +48,62 @@ namespace ThesisBackend.Controllers
                 return StatusCode(500, new { Message = "An error occurred while verifying the test session", Details = ex.Message });
 
             }
+        }
+
+        [Authorize]
+        [HttpGet("activity/sessions")]
+        public async Task<IActionResult> GetUserTakenSessions()
+        {
+            try
+            {
+                if (!TryGetUserId(out var userId))
+                {
+                    return Unauthorized(new { Message = "Invalid token" });
+                }
+
+                var sessions = await _testSessionService.GetUserSessionSummaries(userId);
+                return Ok(sessions);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "An error occurred while fetching your sessions", Details = ex.Message });
+            }
+        }
+
+        [Authorize]
+        [HttpGet("activity/sessions/{sessionId:int}")]
+        public async Task<IActionResult> GetUserTakenSessionDetails(int sessionId)
+        {
+            try
+            {
+                if (!TryGetUserId(out var userId))
+                {
+                    return Unauthorized(new { Message = "Invalid token" });
+                }
+
+                var sessionDetails = await _testSessionService.GetUserSessionDetails(userId, sessionId);
+
+                if (sessionDetails == null)
+                {
+                    return NotFound(new { Message = "Session not found" });
+                }
+
+                return Ok(sessionDetails);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "An error occurred while fetching session details", Details = ex.Message });
+            }
+        }
+
+        private bool TryGetUserId(out int userId)
+        {
+            userId = 0;
+            var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)
+                            ?? User.FindFirst("sub");
+
+            return userIdClaim != null && int.TryParse(userIdClaim.Value, out userId);
         }
     }
 }

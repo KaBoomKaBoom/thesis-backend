@@ -159,22 +159,40 @@ namespace ThesisBackend.Services.TestSessionServices
             {
                 _logger.LogInformation("Fetching session summaries for user: {UserId}", userId);
 
-                var sessionSummaries = await (from session in _testSessionContext.TestSessions
-                                              where session.UserId == userId
-                                              join result in _testSessionContext.TestResults
-                                                  on session.SessionId equals result.SessionId into resultGroup
-                                              from result in resultGroup.DefaultIfEmpty()
-                                              orderby session.TestTakenTime descending
-                                              select new UserSessionSummaryDTO
-                                              {
-                                                  SessionId = session.SessionId,
-                                                  TestId = session.TestId,
-                                                  TestTakenTime = session.TestTakenTime,
-                                                  CorrectAnswers = result != null ? result.CorrectAnswers : null,
-                                                  TotalQuestions = result != null ? result.TotalQuestions : null,
-                                                  ScorePercentage = result != null ? result.ScorePercentage : null,
-                                                  ResultLabel = result != null ? $"{result.CorrectAnswers}/{result.TotalQuestions}" : null
-                                              }).ToListAsync();
+                var sessions = await _testSessionContext.TestSessions
+                    .AsNoTrackingWithIdentityResolution()
+                    .Where(s => s.UserId == userId)
+                    .OrderByDescending(s => s.TestTakenTime)
+                    .ToListAsync();
+
+                var sessionIds = sessions.Select(s => s.SessionId).ToList();
+
+                var latestResultsBySessionId = sessionIds.Count == 0
+                    ? new Dictionary<int, TestResult>()
+                    : (await _testSessionContext.TestResults
+                        .AsNoTrackingWithIdentityResolution()
+                        .Where(r => sessionIds.Contains(r.SessionId))
+                        .ToListAsync())
+                        .GroupBy(r => r.SessionId)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g.OrderByDescending(r => r.VerifiedAt).ThenByDescending(r => r.ResultId).First());
+
+                var sessionSummaries = sessions.Select(session =>
+                {
+                    latestResultsBySessionId.TryGetValue(session.SessionId, out var result);
+
+                    return new UserSessionSummaryDTO
+                    {
+                        SessionId = session.SessionId,
+                        TestId = session.TestId,
+                        TestTakenTime = session.TestTakenTime,
+                        CorrectAnswers = result?.CorrectAnswers,
+                        TotalQuestions = result?.TotalQuestions,
+                        ScorePercentage = result?.ScorePercentage,
+                        ResultLabel = result == null ? null : $"{result.CorrectAnswers}/{result.TotalQuestions}"
+                    };
+                }).ToList();
 
                 return sessionSummaries;
             }
@@ -192,7 +210,7 @@ namespace ThesisBackend.Services.TestSessionServices
                 _logger.LogInformation("Fetching session details for user: {UserId}, session: {SessionId}", userId, sessionId);
 
                 var session = await _testSessionContext.TestSessions
-                    .AsNoTracking()
+                    .AsNoTrackingWithIdentityResolution()
                     .FirstOrDefaultAsync(ts => ts.SessionId == sessionId && ts.UserId == userId);
 
                 if (session == null)
@@ -202,8 +220,11 @@ namespace ThesisBackend.Services.TestSessionServices
                 }
 
                 var result = await _testSessionContext.TestResults
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(tr => tr.SessionId == sessionId);
+                    .AsNoTrackingWithIdentityResolution()
+                    .Where(tr => tr.SessionId == sessionId)
+                    .OrderByDescending(tr => tr.VerifiedAt)
+                    .ThenByDescending(tr => tr.ResultId)
+                    .FirstOrDefaultAsync();
 
                 return new UserSessionDetailsDTO
                 {
@@ -239,6 +260,125 @@ namespace ThesisBackend.Services.TestSessionServices
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to fetch session details for user: {UserId}, session: {SessionId}", userId, sessionId);
+                throw;
+            }
+        }
+
+        public async Task<UserDashboardDTO> GetUserDashboard(int userId)
+        {
+            try
+            {
+                _logger.LogInformation("Fetching dashboard data for user: {UserId}", userId);
+
+                var sessions = await _testSessionContext.TestSessions
+                    .AsNoTrackingWithIdentityResolution()
+                    .Where(ts => ts.UserId == userId)
+                    .OrderByDescending(ts => ts.TestTakenTime)
+                    .ToListAsync();
+
+                var sessionIds = sessions.Select(s => s.SessionId).ToList();
+
+                var results = sessionIds.Count == 0
+                    ? new List<TestResult>()
+                    : await _testSessionContext.TestResults
+                        .AsNoTrackingWithIdentityResolution()
+                        .Where(tr => sessionIds.Contains(tr.SessionId))
+                        .ToListAsync();
+
+                var latestResults = results
+                    .GroupBy(r => r.SessionId)
+                    .Select(g => g.OrderByDescending(r => r.VerifiedAt).ThenByDescending(r => r.ResultId).First())
+                    .ToList();
+
+                var resultsBySessionId = latestResults.ToDictionary(r => r.SessionId, r => r);
+
+                var lastSessionWithResult = sessions
+                    .Select(s => resultsBySessionId.TryGetValue(s.SessionId, out var result) ? result : null)
+                    .FirstOrDefault(r => r != null);
+
+                var stats = new DashboardStatsDTO
+                {
+                    TotalSessions = sessions.Count,
+                    CompletedSessions = latestResults.Count,
+                    AverageScorePercentage = latestResults.Count == 0
+                        ? 0
+                        : (float)Math.Round(latestResults.Average(r => r.ScorePercentage), 2),
+                    BestScorePercentage = latestResults.Count == 0
+                        ? 0
+                        : latestResults.Max(r => r.ScorePercentage),
+                    LastSessionResultLabel = lastSessionWithResult == null
+                        ? null
+                        : $"{lastSessionWithResult.CorrectAnswers}/{lastSessionWithResult.TotalQuestions}",
+                    LastSessionTakenAt = sessions.FirstOrDefault()?.TestTakenTime
+                };
+
+                var recentSessions = sessions
+                    .Take(10)
+                    .Select(s =>
+                    {
+                        resultsBySessionId.TryGetValue(s.SessionId, out var result);
+                        return new DashboardRecentSessionDTO
+                        {
+                            SessionId = s.SessionId,
+                            TestId = s.TestId,
+                            TestTakenTime = s.TestTakenTime,
+                            CorrectAnswers = result?.CorrectAnswers,
+                            TotalQuestions = result?.TotalQuestions,
+                            ScorePercentage = result?.ScorePercentage,
+                            ResultLabel = result == null ? null : $"{result.CorrectAnswers}/{result.TotalQuestions}"
+                        };
+                    })
+                    .ToList();
+
+                var scoreTrend = sessions
+                    .Where(s => resultsBySessionId.ContainsKey(s.SessionId))
+                    .GroupBy(s => s.TestTakenTime.Date)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new DashboardTrendPointDTO
+                    {
+                        Date = g.Key,
+                        SessionsCount = g.Count(),
+                        AverageScorePercentage = (float)Math.Round(g.Average(s => resultsBySessionId[s.SessionId].ScorePercentage), 2)
+                    })
+                    .ToList();
+
+                var questionAnalytics = latestResults
+                    .SelectMany(r => r.DetailedResults)
+                    .GroupBy(dr => dr.QuestionId)
+                    .Select(g => new DashboardQuestionAccuracyDTO
+                    {
+                        QuestionId = g.Key,
+                        Attempts = g.Count(),
+                        CorrectAnswers = g.Count(x => x.IsCorrect),
+                        AccuracyPercentage = (float)Math.Round((double)g.Count(x => x.IsCorrect) * 100 / g.Count(), 2)
+                    })
+                    .ToList();
+
+                var topicAnalytics = new DashboardTopicAnalyticsDTO
+                {
+                    StrongestQuestions = questionAnalytics
+                        .OrderByDescending(q => q.AccuracyPercentage)
+                        .ThenByDescending(q => q.Attempts)
+                        .Take(5)
+                        .ToList(),
+                    WeakestQuestions = questionAnalytics
+                        .OrderBy(q => q.AccuracyPercentage)
+                        .ThenByDescending(q => q.Attempts)
+                        .Take(5)
+                        .ToList()
+                };
+
+                return new UserDashboardDTO
+                {
+                    Stats = stats,
+                    RecentSessions = recentSessions,
+                    ScoreTrend = scoreTrend,
+                    TopicAnalytics = topicAnalytics
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch dashboard data for user: {UserId}", userId);
                 throw;
             }
         }

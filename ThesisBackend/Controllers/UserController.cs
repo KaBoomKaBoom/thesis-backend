@@ -2,18 +2,21 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ThesisBackend.DTOs.TestSessionDTOs;
 using ThesisBackend.DTOs.UserDTOs;
 using ThesisBackend.Models.UserModels;
 using ThesisBackend.Services.AuthServices;
+using ThesisBackend.Services.TestSessionServices;
 
 namespace ThesisBackend.Controllers
 {
     [ApiController]
     [Route("api/user")]
     [Authorize]
-    public class UserController(UserService userService, ILogger<UserController> logger) : ControllerBase
+    public class UserController(UserService userService, TestSessionService testSessionService, ILogger<UserController> logger) : ControllerBase
     {
         private readonly UserService _userService = userService;
+        private readonly TestSessionService _testSessionService = testSessionService;
         private readonly ILogger<UserController> _logger = logger;
 
         [HttpGet("profile")]
@@ -131,6 +134,32 @@ namespace ThesisBackend.Controllers
             {
                 _logger.LogError(ex, "Error updating user profile");
                 return StatusCode(500, new { Message = "An error occurred while updating your profile" });
+            }
+        }
+
+        [HttpGet("dashboard")]
+        public async Task<IActionResult> GetUserDashboard()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)
+                               ?? User.FindFirst(ClaimTypes.NameIdentifier)
+                               ?? User.FindFirst("sub");
+
+                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+                {
+                    _logger.LogWarning("Failed to extract user ID from token");
+                    return Unauthorized(new { Message = "Invalid token" });
+                }
+
+                UserDashboardDTO dashboard = await _testSessionService.GetUserDashboard(userId);
+                _logger.LogInformation("Dashboard retrieved for user: {UserId}", userId);
+                return Ok(dashboard);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving user dashboard");
+                return StatusCode(500, new { Message = "An error occurred while retrieving your dashboard" });
             }
         }
     }

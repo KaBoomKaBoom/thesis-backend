@@ -152,5 +152,95 @@ namespace ThesisBackend.Services.TestSessionServices
                 throw;
             }
         }
+
+        public async Task<List<UserSessionSummaryDTO>> GetUserSessionSummaries(int userId)
+        {
+            try
+            {
+                _logger.LogInformation("Fetching session summaries for user: {UserId}", userId);
+
+                var sessionSummaries = await (from session in _testSessionContext.TestSessions
+                                              where session.UserId == userId
+                                              join result in _testSessionContext.TestResults
+                                                  on session.SessionId equals result.SessionId into resultGroup
+                                              from result in resultGroup.DefaultIfEmpty()
+                                              orderby session.TestTakenTime descending
+                                              select new UserSessionSummaryDTO
+                                              {
+                                                  SessionId = session.SessionId,
+                                                  TestId = session.TestId,
+                                                  TestTakenTime = session.TestTakenTime,
+                                                  CorrectAnswers = result != null ? result.CorrectAnswers : null,
+                                                  TotalQuestions = result != null ? result.TotalQuestions : null,
+                                                  ScorePercentage = result != null ? result.ScorePercentage : null,
+                                                  ResultLabel = result != null ? $"{result.CorrectAnswers}/{result.TotalQuestions}" : null
+                                              }).ToListAsync();
+
+                return sessionSummaries;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch session summaries for user: {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task<UserSessionDetailsDTO?> GetUserSessionDetails(int userId, int sessionId)
+        {
+            try
+            {
+                _logger.LogInformation("Fetching session details for user: {UserId}, session: {SessionId}", userId, sessionId);
+
+                var session = await _testSessionContext.TestSessions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(ts => ts.SessionId == sessionId && ts.UserId == userId);
+
+                if (session == null)
+                {
+                    _logger.LogWarning("Session not found or does not belong to user. User: {UserId}, Session: {SessionId}", userId, sessionId);
+                    return null;
+                }
+
+                var result = await _testSessionContext.TestResults
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(tr => tr.SessionId == sessionId);
+
+                return new UserSessionDetailsDTO
+                {
+                    SessionId = session.SessionId,
+                    TestId = session.TestId,
+                    TestTakenTime = session.TestTakenTime,
+                    Score = session.Score,
+                    TotalQuestions = result?.TotalQuestions,
+                    CorrectAnswers = result?.CorrectAnswers,
+                    Skipped = result?.Skipped,
+                    ScorePercentage = result?.ScorePercentage,
+                    VerifiedAt = result?.VerifiedAt,
+                    SubmittedAnswers = session.TestComponents
+                        .Select(tc => new TestComponentDTO
+                        {
+                            QuestionId = tc.question_id,
+                            AnswerId = tc.answer_id
+                        })
+                        .ToList(),
+                    Results = result?.DetailedResults
+                        .OrderBy(r => r.Position)
+                        .Select(r => new QuestionResultDTO
+                        {
+                            Position = r.Position,
+                            QuestionId = r.QuestionId,
+                            SubmittedAnswerId = r.SubmittedAnswerId,
+                            CorrectAnswerId = r.CorrectAnswerId,
+                            IsCorrect = r.IsCorrect
+                        })
+                        .ToList() ?? new List<QuestionResultDTO>()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch session details for user: {UserId}, session: {SessionId}", userId, sessionId);
+                throw;
+            }
+        }
     }
 }

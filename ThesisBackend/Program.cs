@@ -137,6 +137,8 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 logger.LogInformation($"Using connection string: {connectionString}");
 
+await UserStartupSeeder.SeedUsersIfNeeded(app.Services, logger);
+
 if (app.Environment.IsDevelopment())
 {
     app.MapScalarApiReference("/docs" ,options =>

@@ -3,7 +3,8 @@
 
 
 .env
-
+Scripts/
+Data/UserStartupSeeder.cs
 # User-specific files
 *.rsuser
 *.suo

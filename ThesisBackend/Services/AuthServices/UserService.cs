@@ -303,6 +303,112 @@ namespace ThesisBackend.Services.AuthServices
             return newToken;
         }
 
+        public async Task<PaginatedStudentsResponseDTO> SearchStudents(
+            int pageNumber,
+            int pageSize,
+            string? name,
+            string? grade,
+            string? school,
+            string? location)
+        {
+            _logger.LogInformation("Searching students. Page: {PageNumber}, PageSize: {PageSize}, Name: {Name}, Grade: {Grade}, School: {School}, Location: {Location}",
+                pageNumber, pageSize, name, grade, school, location);
+
+            var query = _userContext.Users
+                .OfType<Student>()
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                var normalizedName = name.Trim().ToLower();
+                query = query.Where(s =>
+                    s.FirstName.ToLower().Contains(normalizedName)
+                    || s.LastName.ToLower().Contains(normalizedName)
+                    || (s.FirstName + " " + s.LastName).ToLower().Contains(normalizedName)
+                    || (s.LastName + " " + s.FirstName).ToLower().Contains(normalizedName));
+            }
+
+            if (!string.IsNullOrWhiteSpace(grade))
+            {
+                var normalizedGrade = grade.Trim().ToLower();
+                query = query.Where(s => s.Grade.ToLower().Contains(normalizedGrade));
+            }
+
+            if (!string.IsNullOrWhiteSpace(school))
+            {
+                var normalizedSchool = school.Trim().ToLower();
+                query = query.Where(s => s.Institution.ToLower().Contains(normalizedSchool));
+            }
+
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                var normalizedLocation = location.Trim().ToLower();
+                query = query.Where(s => s.Location.ToLower().Contains(normalizedLocation));
+            }
+
+            var totalCount = await query.CountAsync();
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+            var students = await query
+                .OrderBy(s => s.FirstName)
+                .ThenBy(s => s.LastName)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(s => new StudentSearchResultDTO
+                {
+                    StudentId = s.UserId,
+                    FirstName = s.FirstName,
+                    LastName = s.LastName,
+                    Email = s.Email,
+                    Grade = s.Grade,
+                    School = s.Institution,
+                    Location = s.Location,
+                    TeacherId = s.TeacherId
+                })
+                .ToListAsync();
+
+            return new PaginatedStudentsResponseDTO
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                Students = students
+            };
+        }
+
+        public async Task<Student?> AssignTeacherToStudent(int teacherId, int studentId)
+        {
+            _logger.LogInformation("Assigning teacher {TeacherId} to student {StudentId}", teacherId, studentId);
+
+            var teacherExists = await _userContext.Users
+                .OfType<Teacher>()
+                .AnyAsync(t => t.UserId == teacherId);
+
+            if (!teacherExists)
+            {
+                _logger.LogWarning("Teacher with ID {TeacherId} not found", teacherId);
+                throw new InvalidOperationException("Teacher not found");
+            }
+
+            var student = await _userContext.Users
+                .OfType<Student>()
+                .FirstOrDefaultAsync(s => s.UserId == studentId);
+
+            if (student == null)
+            {
+                _logger.LogWarning("Student with ID {StudentId} not found", studentId);
+                return null;
+            }
+
+            student.TeacherId = teacherId;
+            await _userContext.SaveChangesAsync();
+
+            _logger.LogInformation("Teacher {TeacherId} assigned to student {StudentId}", teacherId, studentId);
+            return student;
+        }
+
         
     }
 }

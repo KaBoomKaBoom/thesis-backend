@@ -138,23 +138,37 @@ namespace ThesisBackend.Controllers
         }
 
         [HttpGet("dashboard")]
-        public async Task<IActionResult> GetUserDashboard()
+        public async Task<IActionResult> GetUserDashboard([FromQuery] int? studentId = null)
         {
             try
             {
-                var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)
-                               ?? User.FindFirst(ClaimTypes.NameIdentifier)
-                               ?? User.FindFirst("sub");
-
-                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+                if (studentId.HasValue)
                 {
-                    _logger.LogWarning("Failed to extract user ID from token");
-                    return Unauthorized(new { Message = "Invalid token" });
+                    _logger.LogInformation("Fetching dashboard for student ID: {StudentId}", studentId.Value);
+                    var dashboard = await _testSessionService.GetUserDashboard(studentId.Value);
+                    if (dashboard == null)
+                    {
+                        _logger.LogWarning("Dashboard not found for student ID: {StudentId}", studentId.Value);
+                        return NotFound(new { Message = "Dashboard not found for the specified student" });
+                    }
+                    return Ok(dashboard);
                 }
+                else
+                {
+                    var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)
+                                   ?? User.FindFirst(ClaimTypes.NameIdentifier)
+                                   ?? User.FindFirst("sub");
 
-                UserDashboardDTO dashboard = await _testSessionService.GetUserDashboard(userId);
-                _logger.LogInformation("Dashboard retrieved for user: {UserId}", userId);
-                return Ok(dashboard);
+                    if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+                    {
+                        _logger.LogWarning("Failed to extract user ID from token");
+                        return Unauthorized(new { Message = "Invalid token" });
+                    }
+
+                    UserDashboardDTO dashboard = await _testSessionService.GetUserDashboard(userId);
+                    _logger.LogInformation("Dashboard retrieved for user: {UserId}", userId);
+                    return Ok(dashboard);
+                }
             }
             catch (Exception ex)
             {

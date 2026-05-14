@@ -303,6 +303,45 @@ namespace ThesisBackend.Services.AuthServices
             return newToken;
         }
 
+        public async Task<List<User>> GetAllUsers()
+        {
+            _logger.LogInformation("Fetching all users");
+            return await _userContext.Users
+                .AsNoTracking()
+                .OrderBy(u => u.UserId)
+                .ToListAsync();
+        }
+
+        public async Task<List<User>> GetUsersByRole(string role)
+        {
+            var normalizedRole = role.Trim().ToLowerInvariant();
+            _logger.LogInformation("Fetching users by role: {Role}", normalizedRole);
+
+            return await _userContext.Users
+                .AsNoTracking()
+                .Where(u => u.Role.ToLower() == normalizedRole)
+                .OrderBy(u => u.UserId)
+                .ToListAsync();
+        }
+
+        public async Task<bool> DeleteUser(int userId)
+        {
+            _logger.LogInformation("Deleting user with ID: {UserId}", userId);
+
+            var user = await _userContext.Users.FindAsync(userId);
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID: {UserId} not found for deletion", userId);
+                return false;
+            }
+
+            _userContext.Users.Remove(user);
+            await _userContext.SaveChangesAsync();
+
+            _logger.LogInformation("User with ID: {UserId} deleted successfully", userId);
+            return true;
+        }
+
         public async Task<PaginatedStudentsResponseDTO> SearchStudents(
             int pageNumber,
             int pageSize,
